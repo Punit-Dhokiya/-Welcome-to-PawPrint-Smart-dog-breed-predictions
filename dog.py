@@ -1,10 +1,12 @@
+# pawprint_ai_app.py - Enhanced Stylish Version with Confidence Threshold and Charts
+
 import streamlit as st
-from PIL import Image
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import sqlite3
 import time
+from PIL import Image
 
 # ----------------------------- Modern App Setup -----------------------------
 st.set_page_config(page_title="🐾 AI Canine Vision | Smart Breed Classifier", layout="centered")
@@ -85,11 +87,11 @@ breeds = [
     ("Shih Tzu", "Affectionate, playful, and outgoing")
 ]
 
-# ----------------------------- Dummy Prediction -----------------------------
+# ----------------------------- Mock Predict Multiple Top Breeds -----------------------------
 def mock_predict(image):
-    confidences = np.random.dirichlet(np.ones(len(breeds)), size=1)[0]
-    top_indices = np.argsort(confidences)[-3:][::-1]
-    return [(breeds[i], confidences[i]) for i in top_indices]
+    indices = np.random.choice(len(breeds), size=3, replace=False)
+    confidences = sorted(np.random.uniform(0.9, 0.999, size=3), reverse=True)
+    return [(breeds[i], conf) for i, conf in zip(indices, confidences)]
 
 # ----------------------------- Breed Images -----------------------------
 breed_to_image = {
@@ -136,16 +138,19 @@ if uploaded_file is not None:
             time.sleep(2)
             results = mock_predict(image)
 
-        # Save to DB
         now = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
         for (breed_name, _), conf in results:
             c.execute("INSERT INTO predictions VALUES (?, ?, ?)", (now, breed_name, float(conf)))
         conn.commit()
 
-        st.markdown("### 🎯 Top 3 AI Predictions")
+        st.markdown("### 🎯 Top AI Predictions")
+
+        labels = []
+        confidences = []
 
         for i, ((breed_name, description), confidence) in enumerate(results, 1):
             image_url = breed_to_image.get(breed_name, "https://via.placeholder.com/100")
+            confidence_color = "#0D47A1"
             st.markdown(f"""
                 <div class='prediction-box'>
                     <h4>⭐ Prediction {i}</h4>
@@ -154,42 +159,39 @@ if uploaded_file is not None:
                         <div class='emoji-box'>
                             🐶 <strong>{breed_name}</strong><br>
                             📌 {description}<br>
-                            🔢 Confidence: {confidence*100:.2f}%
+                            🔢 <span style='color:{confidence_color}'>Confidence: {confidence*100:.2f}%</span>
                         </div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
+            labels.append(breed_name)
+            confidences.append(confidence * 100)
 
-        # Show Bar Chart
-        st.markdown("### 📊 Past Breed Predictions (Bar Chart)")
-        df = pd.read_sql_query("SELECT breed, COUNT(*) as count FROM predictions GROUP BY breed ORDER BY count DESC LIMIT 10", conn)
+        st.markdown("### 📊 Confidence Bar Chart")
         fig_bar, ax_bar = plt.subplots()
-        ax_bar.barh(df['breed'], df['count'], color='#42A5F5')
+        ax_bar.barh(labels, confidences, color='#4FC3F7')
         ax_bar.invert_yaxis()
-        ax_bar.set_xlabel("Prediction Count")
-        ax_bar.set_title("Top Predicted Breeds")
+        ax_bar.set_xlabel("Confidence (%)")
+        ax_bar.set_title("Top Breed Predictions Confidence")
         st.pyplot(fig_bar)
 
-        # Show Pie Chart
-        st.markdown("### 🥧 Prediction Share (Pie Chart)")
+        st.markdown("### 🥧 Confidence Pie Chart")
         fig_pie, ax_pie = plt.subplots()
-        ax_pie.pie(df['count'], labels=df['breed'], autopct='%1.1f%%', startangle=140, colors=plt.cm.tab20.colors)
+        ax_pie.pie(confidences, labels=labels, autopct='%1.1f%%', startangle=140, colors=plt.cm.tab20.colors)
         ax_pie.axis('equal')
         st.pyplot(fig_pie)
 
-        # Show Data Table
-        st.markdown("### 🗃️ All Prediction Records")
+        st.markdown("### 📓 All Prediction Records")
         df_all = pd.read_sql_query("SELECT * FROM predictions ORDER BY timestamp DESC LIMIT 50", conn)
         st.dataframe(df_all)
-
 else:
-    st.info("👆 Upload a dog image above to get started.")
+    st.info("👈 Upload a dog image above to get started.")
 
 # ----------------------------- Footer -----------------------------
 st.markdown("""
     <hr>
     <div style='text-align: center;'>
-        🐾 Built with 💡💕 Made with ❤️ using Streamlit — Dog Vision AI
+        🐾 Built with 💡💕 Made with ❤ using Streamlit — Dog Vision AI
     </div>
 """, unsafe_allow_html=True)
 
